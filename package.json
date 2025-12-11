@@ -1,0 +1,50 @@
+{
+  "name": "@woocommerce/qit-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for QIT (Quality Insights Toolkit) - enables natural language interaction and agent-based workflows for WordPress/WooCommerce plugin testing",
+  "main": "dist/index.js",
+  "bin": {
+    "qit-mcp": "dist/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint src/",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "qit",
+    "woocommerce",
+    "wordpress",
+    "testing",
+    "ai",
+    "claude"
+  ],
+  "author": "WooCommerce",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/woocommerce/qit-mcp.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  }
+}
