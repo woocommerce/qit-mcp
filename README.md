@@ -115,11 +115,12 @@ The MCP server automatically detects QIT CLI in this order:
 | `exec_in_environment` | Execute command in environment container |
 | `reset_environment` | Reset environment database |
 
-### Packages (1 tool)
+### Packages (2 tools)
 
 | Tool | Description |
 |------|-------------|
-| `manage_package` | Manage test packages (publish, download, scaffold, list, delete, show) |
+| `manage_package` | Manage test packages (publish, download, scaffold, delete, show) |
+| `list_packages` | List available test packages with filtering |
 
 ### Configuration (1 tool)
 
