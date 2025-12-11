@@ -16,14 +16,6 @@ An MCP (Model Context Protocol) server that wraps the [QIT CLI](https://github.c
 
 ## Installation
 
-### Via npm (recommended)
-
-```bash
-npm install -g @woocommerce/qit-mcp
-```
-
-### From source
-
 ```bash
 git clone https://github.com/woocommerce/qit-mcp
 cd qit-mcp
@@ -35,31 +27,17 @@ npm run build
 
 ### Claude Code
 
-Add to your Claude Code MCP settings (`~/.claude/settings.json`):
+Add to your Claude Code MCP settings (`~/.claude.json`):
 
 ```json
 {
   "mcpServers": {
     "qit": {
-      "command": "npx",
-      "args": ["@woocommerce/qit-mcp"]
-    }
-  }
-}
-```
-
-### Custom QIT CLI Path
-
-If QIT CLI is not in your PATH, set the `QIT_CLI_PATH` environment variable:
-
-```json
-{
-  "mcpServers": {
-    "qit": {
-      "command": "npx",
-      "args": ["@woocommerce/qit-mcp"],
+      "type": "stdio",
+      "command": "node",
+      "args": ["/path/to/qit-mcp/dist/index.js"],
       "env": {
-        "QIT_CLI_PATH": "/path/to/vendor/bin/qit"
+        "QIT_CLI_PATH": "/path/to/qit-cli/qit"
       }
     }
   }
