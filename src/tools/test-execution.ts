@@ -77,11 +77,11 @@ export const testExecutionTools = {
       wp_version: z
         .string()
         .optional()
-        .describe("WordPress version to use (e.g., '6.4', '6.5', 'stable', 'rc')"),
+        .describe("WordPress version. Omit unless the bug requires a specific WP version. Prefer 'stable' or 'rc'. Pinning an older numeric version may break plugin activation (e.g., current WooCommerce requires WP 6.8+)."),
       wc_version: z
         .string()
         .optional()
-        .describe("WooCommerce version to use (e.g., '8.5', '9.0', 'latest')"),
+        .describe("WooCommerce version. Omit unless the bug requires a specific WooCommerce version. Use 'latest' for the current release."),
       additional_plugins: z
         .array(z.string())
         .optional()

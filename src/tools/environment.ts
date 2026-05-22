@@ -2,6 +2,71 @@ import { z } from "zod";
 import { executeAndFormat, buildArgs, executeQitCommand } from "../cli/executor.js";
 
 const tunnelMethods = ["no_tunnel", "cloudflare", "ngrok"] as const;
+
+/**
+ * Parse qit env:up human-readable output into structured fields.
+ *
+ * Expected output format (simplified):
+ *   Environment ready: qitenvf37b92852e51bb21
+ *     URL:         http://localhost:32774
+ *     Credentials: admin/password
+ *     Stack:       WordPress stable, PHP 8.2
+ *     Plugins:     WooCommerce 10.7.0
+ *
+ * Falls back gracefully: missing fields end up in parse_warning.
+ */
+interface ParsedEnvUp {
+  env_id?: string;
+  site_url?: string;
+  admin_user?: string;
+  admin_password?: string;
+  parse_warning?: string;
+}
+
+function parseEnvUpOutput(raw: string): ParsedEnvUp {
+  // Strip ANSI escape codes (color/style sequences) before matching
+  // eslint-disable-next-line no-control-regex
+  const noAnsi = raw.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+
+  // Strip PHP deprecation noise that may leak in via stderr
+  const text = noAnsi
+    .split("\n")
+    .filter(
+      (line) =>
+        !line.includes("Deprecated:") && !line.includes("PHP Deprecated:")
+    )
+    .join("\n");
+
+  // env_id: "Environment ready: qitenv<hex>" anywhere on a line
+  const envIdMatch = text.match(/Environment\s+ready[^:]*:\s*(qitenv[0-9a-f]+)/i);
+
+  // URL: "URL:  http://localhost:NNNNN" - value is everything non-whitespace after the colon.
+  const urlMatch = text.match(/^\s*(?:URL|Site URL)\s*:\s*(https?:\/\/[^\s]+)/im);
+
+  // Credentials: "Credentials: admin/password" or "Credentials: admin / password".
+  const credsMatch = text.match(/^\s*Credentials\s*:\s*([^\s/]+)\s*\/\s*([^\s]+)/im);
+
+  const out: ParsedEnvUp = {};
+  if (envIdMatch) out.env_id = envIdMatch[1];
+  if (urlMatch) out.site_url = urlMatch[1].replace(/[/,]+$/, ""); // strip trailing punctuation
+  if (credsMatch) {
+    out.admin_user = credsMatch[1];
+    out.admin_password = credsMatch[2];
+  }
+
+  const requiredFields: Array<keyof Omit<ParsedEnvUp, "parse_warning">> = [
+    "env_id",
+    "site_url",
+    "admin_user",
+    "admin_password",
+  ];
+  const missing = requiredFields.filter((key) => !(key in out));
+  if (missing.length > 0) {
+    out.parse_warning = `Could not parse: ${missing.join(", ")}. See raw_output.`;
+  }
+  return out;
+}
+
 const environmentTypes = ["e2e", "performance"] as const;
 
 export const environmentTools = {
@@ -21,15 +86,15 @@ export const environmentTools = {
       wp_version: z
         .string()
         .optional()
-        .describe("WordPress version to use (e.g., '6.4', '6.5', 'stable', 'rc')"),
+        .describe("WordPress version. Omit unless the bug requires a specific WP version. Prefer 'stable' or 'rc'. Pinning an older numeric version may break plugin activation (e.g., current WooCommerce requires WP 6.8+)."),
       wc_version: z
         .string()
         .optional()
-        .describe("WooCommerce version to use (e.g., '8.5', '9.0', 'latest')"),
+        .describe("WooCommerce version. Omit unless the bug requires a specific WooCommerce version. Use 'latest' for the current release."),
       plugins: z
         .array(z.string())
         .optional()
-        .describe("Plugins to install (slug, path, or URL)"),
+        .describe("Plugins to install, as an array of bare slugs, e.g. [\"woocommerce\"]. Never pass a JSON string or scalar."),
       themes: z
         .array(z.string())
         .optional()
@@ -78,10 +143,6 @@ export const environmentTools = {
         .boolean()
         .optional()
         .describe("Skip activating themes during environment setup"),
-      json: z
-        .boolean()
-        .optional()
-        .describe("Return output in JSON format"),
     }),
     handler: async (args: {
       environment_type?: (typeof environmentTypes)[number];
@@ -101,7 +162,6 @@ export const environmentTools = {
       skip_setup?: boolean;
       skip_activating_plugins?: boolean;
       skip_activating_themes?: boolean;
-      json?: boolean;
     }) => {
       // Use canonical flag names from the trunk QIT CLI
       // These support aliases (--wp, --woo) for backwards compatibility
@@ -116,7 +176,6 @@ export const environmentTools = {
         "skip-setup": args.skip_setup,
         skip_activating_plugins: args.skip_activating_plugins,
         skip_activating_themes: args.skip_activating_themes,
-        json: args.json,
       };
 
       const cmdArgs = buildArgs("env:up", [], flags);
@@ -158,8 +217,40 @@ export const environmentTools = {
         }
       }
 
-      // Environment startup can take a while
-      return executeAndFormat(cmdArgs, { timeout: 600000 });
+      // Environment startup can take a while; parse output for structured creds
+      const result = await executeQitCommand(cmdArgs, { timeout: 600000 });
+      const rawOutput = result.stdout + "\n" + result.stderr;
+
+      if (!result.success) {
+        return {
+          content: result.stderr || result.stdout || "Failed to start environment",
+          isError: true,
+        };
+      }
+
+      const parsed = parseEnvUpOutput(rawOutput);
+
+      if (!parsed.env_id) {
+        return {
+          content: result.stderr || result.stdout || "Failed to start environment (no env_id parsed from output)",
+          isError: true,
+        };
+      }
+
+      const payload = {
+        env_id: parsed.env_id,
+        site_url: parsed.site_url,
+        admin_user: parsed.admin_user,
+        admin_password: parsed.admin_password,
+        ...(parsed.parse_warning
+          ? { parse_warning: parsed.parse_warning, raw_output: rawOutput }
+          : {}),
+      };
+
+      return {
+        content: JSON.stringify(payload, null, 2),
+        isError: false,
+      };
     },
   },
 
@@ -264,24 +355,29 @@ export const environmentTools = {
   exec_in_environment: {
     name: "exec_in_environment",
     description:
-      "Execute a command inside a running QIT test environment's PHP container.",
+      "Execute a command inside a running QIT test environment's PHP container. " +
+      "Always pass `{env_id, command}` as named args. Never put the env id inside `command`.",
     inputSchema: z.object({
       command: z.string().describe("Command to execute inside the container"),
       env_id: z
         .string()
-        .optional()
-        .describe(
-          "Environment ID. If not provided, uses the most recent environment."
-        ),
+        .describe("The environment ID to execute the command in (e.g. qitenv...)"),
     }),
-    handler: async (args: { command: string; env_id?: string }) => {
-      const cmdArgs = ["env:exec"];
-
-      if (args.env_id) {
-        cmdArgs.push("--env", args.env_id);
+    handler: async (args: { command: string; env_id: string }) => {
+      // Guard: defend against the agent passing env_id as command (observed
+      // first-call routing bug in runs #1 and #2).
+      if (/^qitenv[0-9a-f]+$/i.test(args.command)) {
+        return {
+          content: `env_id passed as command. Received command="${args.command}", env_id="${args.env_id}". Retry with {env_id: "qitenv...", command: "wp ..."}.`,
+          isError: true,
+        };
       }
 
-      cmdArgs.push("--", args.command);
+      // qit-cli env:exec uses --env_id flag: `env:exec --env_id <env_id> -- <command>`.
+      // The executor spawns with shell: true, which sh-splits each arg on whitespace.
+      // Single-quote-escape the command so qit-cli sees it as ONE positional arg.
+      const escaped = "'" + args.command.replace(/'/g, "'\\''") + "'";
+      const cmdArgs = ["env:exec", "--env_id", args.env_id, "--", escaped];
 
       return executeAndFormat(cmdArgs, { timeout: 300000 });
     },

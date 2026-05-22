@@ -23,38 +23,48 @@ describe("environmentTools", () => {
   });
 
   describe("start_environment", () => {
+    const envUpOutput = `PHP Deprecated: ReflectionProperty::setAccessible() is deprecated
+✅ Environment ready: qitenvf37b92852e51bb21
+  URL:         http://localhost:32774,
+  Credentials: admin / password
+  Stack:       WordPress stable, PHP 8.2
+  Plugins:     WooCommerce 10.7.0`;
+
+    function mockEnvUp(overrides = {}) {
+      vi.mocked(executor.executeQitCommand).mockResolvedValue(
+        mockResult({ success: true, stdout: envUpOutput, ...overrides })
+      );
+    }
+
     it("should start environment with minimal options", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
-      await environmentTools.start_environment.handler({});
+      const result = await environmentTools.start_environment.handler({});
 
-      const call = vi.mocked(executor.executeAndFormat).mock.calls[0];
+      const call = vi.mocked(executor.executeQitCommand).mock.calls[0];
       expect(call[0]).toContain("env:up");
+      expect(JSON.parse(result.content)).toEqual({
+        env_id: "qitenvf37b92852e51bb21",
+        site_url: "http://localhost:32774",
+        admin_user: "admin",
+        admin_password: "password",
+      });
     });
 
     it("should include environment type", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         environment_type: "e2e",
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args).toContain("--environment_type");
       expect(args).toContain("e2e");
     });
 
     it("should include all version flags", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         php_version: "8.3",
@@ -62,7 +72,7 @@ describe("environmentTools", () => {
         wc_version: "9.0",
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args).toContain("--php_version");
       expect(args).toContain("8.3");
       expect(args).toContain("--wordpress_version");
@@ -72,16 +82,13 @@ describe("environmentTools", () => {
     });
 
     it("should add plugins array", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         plugins: ["woocommerce", "jetpack", "/path/to/local-plugin.zip"],
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args.filter((a: string) => a === "--plugin").length).toBe(3);
       expect(args).toContain("woocommerce");
       expect(args).toContain("jetpack");
@@ -89,147 +96,117 @@ describe("environmentTools", () => {
     });
 
     it("should add themes array", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         themes: ["storefront", "twentytwentyfour"],
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args.filter((a: string) => a === "--theme").length).toBe(2);
       expect(args).toContain("storefront");
       expect(args).toContain("twentytwentyfour");
     });
 
     it("should add test_packages array", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         test_packages: ["woo/e2e-tests:1.0.0"],
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args).toContain("--test-package");
       expect(args).toContain("woo/e2e-tests:1.0.0");
     });
 
     it("should add utilities array", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         utilities: ["qit/woo-setup:1.0.0"],
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args).toContain("--utility");
       expect(args).toContain("qit/woo-setup:1.0.0");
     });
 
     it("should add volumes array", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         volumes: ["/host/path:/container/path"],
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args).toContain("--volume");
       expect(args).toContain("/host/path:/container/path");
     });
 
     it("should add php_extensions array", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         php_extensions: ["gd", "imagick"],
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args.filter((a: string) => a === "--php_extension").length).toBe(2);
       expect(args).toContain("gd");
       expect(args).toContain("imagick");
     });
 
     it("should add env_vars as --env flags", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         env_vars: { WP_DEBUG: "true", SCRIPT_DEBUG: "true" },
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args.filter((a: string) => a === "--env").length).toBe(2);
       expect(args).toContain("WP_DEBUG=true");
       expect(args).toContain("SCRIPT_DEBUG=true");
     });
 
     it("should include object_cache flag", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         object_cache: true,
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args).toContain("--object_cache");
     });
 
     it("should include tunnel method", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         tunnel: "ngrok",
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args).toContain("--tunnel");
       expect(args).toContain("ngrok");
     });
 
     it("should include config path", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         config: "/path/to/qit.json",
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args).toContain("--config");
       expect(args).toContain("/path/to/qit.json");
     });
 
     it("should include skip flags", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({
         skip_setup: true,
@@ -237,36 +214,53 @@ describe("environmentTools", () => {
         skip_activating_themes: true,
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
       expect(args).toContain("--skip-setup");
       expect(args).toContain("--skip_activating_plugins");
       expect(args).toContain("--skip_activating_themes");
     });
 
-    it("should include json flag", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "{}",
-        isError: false,
-      });
-
-      await environmentTools.start_environment.handler({
-        json: true,
-      });
-
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
-      expect(args).toContain("--json");
-    });
-
-    it("should use 10 minute timeout", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Environment started",
-        isError: false,
-      });
+    it("should not request JSON output from qit env:up", async () => {
+      mockEnvUp();
 
       await environmentTools.start_environment.handler({});
 
-      const options = vi.mocked(executor.executeAndFormat).mock.calls[0][1];
+      const args = vi.mocked(executor.executeQitCommand).mock.calls[0][0];
+      expect(args).not.toContain("--json");
+    });
+
+    it("should use 10 minute timeout", async () => {
+      mockEnvUp();
+
+      await environmentTools.start_environment.handler({});
+
+      const options = vi.mocked(executor.executeQitCommand).mock.calls[0][1];
       expect(options?.timeout).toBe(600000);
+    });
+
+    it("should return parse warning when env starts but optional fields are missing", async () => {
+      mockEnvUp({
+        stdout: "Environment ready: qitenvabcdef1234567890",
+      });
+
+      const result = await environmentTools.start_environment.handler({});
+      const payload = JSON.parse(result.content);
+
+      expect(result.isError).toBe(false);
+      expect(payload.env_id).toBe("qitenvabcdef1234567890");
+      expect(payload.parse_warning).toContain("site_url");
+      expect(payload.raw_output).toContain("Environment ready");
+    });
+
+    it("should return CLI failure before parsing output", async () => {
+      vi.mocked(executor.executeQitCommand).mockResolvedValue(
+        mockResult({ success: false, stderr: "Docker not running", exitCode: 1 })
+      );
+
+      const result = await environmentTools.start_environment.handler({});
+
+      expect(result.isError).toBe(true);
+      expect(result.content).toBe("Docker not running");
     });
   });
 
@@ -368,20 +362,12 @@ ${sampleOutputs.envList}`;
   });
 
   describe("exec_in_environment", () => {
-    it("should execute command in most recent environment", async () => {
-      vi.mocked(executor.executeAndFormat).mockResolvedValue({
-        content: "Command output",
-        isError: false,
-      });
-
-      await environmentTools.exec_in_environment.handler({
+    it("should require env_id in schema", () => {
+      const parsed = environmentTools.exec_in_environment.inputSchema.safeParse({
         command: "wp plugin list",
       });
 
-      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
-      expect(args).toContain("env:exec");
-      expect(args).toContain("--");
-      expect(args).toContain("wp plugin list");
+      expect(parsed.success).toBe(false);
     });
 
     it("should execute command in specific environment", async () => {
@@ -397,10 +383,10 @@ ${sampleOutputs.envList}`;
 
       const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
       expect(args).toContain("env:exec");
-      expect(args).toContain("--env");
+      expect(args).toContain("--env_id");
       expect(args).toContain("qitenv123");
       expect(args).toContain("--");
-      expect(args).toContain("ls -la");
+      expect(args).toContain("'ls -la'");
     });
 
     it("should use 5 minute timeout", async () => {
@@ -411,10 +397,37 @@ ${sampleOutputs.envList}`;
 
       await environmentTools.exec_in_environment.handler({
         command: "wp core update",
+        env_id: "qitenv123",
       });
 
       const options = vi.mocked(executor.executeAndFormat).mock.calls[0][1];
       expect(options?.timeout).toBe(300000);
+    });
+
+    it("should reject env_id passed as command", async () => {
+      const result = await environmentTools.exec_in_environment.handler({
+        command: "qitenv123abc",
+        env_id: "qitenv456def",
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content).toContain("env_id passed as command");
+      expect(executor.executeAndFormat).not.toHaveBeenCalled();
+    });
+
+    it("should shell-quote commands containing single quotes", async () => {
+      vi.mocked(executor.executeAndFormat).mockResolvedValue({
+        content: "Command output",
+        isError: false,
+      });
+
+      await environmentTools.exec_in_environment.handler({
+        command: "wp option update blogname 'My Store'",
+        env_id: "qitenv123",
+      });
+
+      const args = vi.mocked(executor.executeAndFormat).mock.calls[0][0];
+      expect(args.at(-1)).toBe("'wp option update blogname '\\''My Store'\\'''");
     });
   });
 
